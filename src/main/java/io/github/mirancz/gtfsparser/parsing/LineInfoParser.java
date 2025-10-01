@@ -38,9 +38,9 @@ public class LineInfoParser extends Parser {
     }
 
     private static void writeColor(DataOutputStream output, Color backgroundColor) throws IOException {
-        output.writeInt(backgroundColor.getRed());
-        output.writeInt(backgroundColor.getGreen());
-        output.writeInt(backgroundColor.getBlue());
+        output.write(backgroundColor.getRed());
+        output.write(backgroundColor.getGreen());
+        output.write(backgroundColor.getBlue());
     }
 
     private static Color parseColor(String color) {
