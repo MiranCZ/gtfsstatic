@@ -11,7 +11,10 @@ public class StopParser extends Parser {
 
     private final HashSet<Integer> processed = new HashSet<>();
 
-    @Override
+    public StopParser() {
+        subscribeTransformer("stops.txt", "stops", this::parseAndWrite);
+    }
+
     public void parseAndWrite(InputStream input, DataOutputStream output) throws IOException {
         Csv stops = Csv.parse(input);
 

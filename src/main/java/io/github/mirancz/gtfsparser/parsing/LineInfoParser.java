@@ -9,7 +9,10 @@ import java.util.Iterator;
 
 public class LineInfoParser extends Parser {
 
-    @Override
+    public LineInfoParser(){
+        subscribeTransformer("routes.txt", "lines", this::parseAndWrite);
+    }
+
     protected void parseAndWrite(InputStream input, DataOutputStream output) throws Exception {
         Csv stops = Csv.parse(input);
 
