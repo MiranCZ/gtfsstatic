@@ -64,6 +64,14 @@ public class Main {
         }
 
         zip.close();
+
+        Files.writeString(getDataRoot().resolve("info"), generateInfoString());
+    }
+
+    private static String generateInfoString() {
+        return "{" +
+                "\"lastUpdated\":"+System.currentTimeMillis()+
+                "}";
     }
 
     private static Path getDataRoot() {

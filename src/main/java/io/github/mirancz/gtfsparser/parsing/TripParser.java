@@ -133,7 +133,7 @@ public class TripParser extends Parser {
 
         Iterator<Csv.CsvLine> lines = tripsCsv.getLines();
 
-        record Trip(int id, int serviceId, int lineId, int headsignId) {
+        record Trip(int id, int serviceId, int lineId, int headsignId, int blockId, byte data) {
         }
 
         Map<String, Integer> headsignPool = new HashMap<>();
@@ -164,7 +164,12 @@ public class TripParser extends Parser {
                 headsignPool.put(headSign, (headsignId = (poolId++)));
             }
 
-            trips.add(new Trip(id, serviceId, lineId, headsignId));
+            int blockId = line.getIntOrDefault("block_id", -1);
+            boolean bikesAllowed = line.getBoolean("wheelchair_accessible");
+
+            byte data = 0;
+            if (bikesAllowed) data = 1;
+            trips.add(new Trip(id, serviceId, lineId, headsignId, blockId, data));
         }
 
         os.writeInt(headsignPool.size());
@@ -180,14 +185,15 @@ public class TripParser extends Parser {
 
         os.writeInt(trips.size());
         for (Trip trip : trips) {
-            if (trip.serviceId > Short.MAX_VALUE || trip.lineId > Short.MAX_VALUE) {
+            if (trip.serviceId > Short.MAX_VALUE || trip.lineId > Short.MAX_VALUE || trip.blockId > Short.MAX_VALUE) {
                 throw new IllegalStateException();
             }
 
-//            os.writeInt(trip.id);
             os.writeShort(trip.serviceId);
             os.writeShort(trip.lineId);
             os.writeInt(trip.headsignId);
+            os.writeShort(trip.blockId);
+            os.write(trip.data);
         }
     }
 
