@@ -1,10 +1,7 @@
 package io.github.mirancz.gtfsparser;
 
 
-import io.github.mirancz.gtfsparser.parsing.LineInfoParser;
-import io.github.mirancz.gtfsparser.parsing.Parser;
-import io.github.mirancz.gtfsparser.parsing.StopParser;
-import io.github.mirancz.gtfsparser.parsing.TripParser;
+import io.github.mirancz.gtfsparser.parsing.*;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -22,7 +19,7 @@ public class Main {
     private static final List<Parser> parsers;
 
     static {
-        parsers = List.of(new StopParser(), new LineInfoParser(), new TripParser());
+        parsers = List.of(new StopParser(), new LineInfoParser(), new TripParser(), new ApiParser());
     }
 
     public static void main(String[] args) throws IOException {

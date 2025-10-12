@@ -24,7 +24,7 @@ public class LineInfoParser extends Parser {
 
             int routeId = parseRoute(line.get("route_id"));
             String name = line.get("route_short_name");
-            Color backgroundColor = parseColor(line.get("route_color"));
+            Color backgroundColor = parseColor(line.getOrDefault("route_color","00E68C"));
             Color textColor = parseColor(line.getOrDefault("route_text_color", "000000"));
 
 

@@ -87,7 +87,7 @@ public class Csv {
 
         public String getOrDefault(String name, String defaultValue) {
             String result = get(name);
-            if (result == null) return defaultValue;
+            if (result == null || result.isBlank()) return defaultValue;
             return result;
         }
 
