@@ -19,7 +19,7 @@ public class Main {
     private static final List<Parser> parsers;
 
     static {
-        parsers = List.of(new StopParser(), new LineInfoParser(), new TripParser(), new ApiParser());
+        parsers = List.of(new StopParser(), new LineInfoParser(), new TripParser(), new ApiParser(), new CalendarParser());
     }
 
     public static void main(String[] args) throws IOException {
