@@ -47,7 +47,7 @@ public class ApiParser extends Parser {
             result.add(new Pair<>(tripId, ((lineId<<16) | routeId)));
         }
 
-        output.write(result.size());
+        output.writeInt(result.size());
         for (Pair<Integer, Integer> pair : result) {
             output.writeInt(pair.left());
             output.writeInt(pair.right());
