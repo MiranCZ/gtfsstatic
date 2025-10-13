@@ -18,6 +18,7 @@ public class TripParser extends Parser {
 
     private static void writeTripToRoute(DataOutputStream os, List<RouteStop> routeStops) throws IOException {
         for (RouteStop routeStop : routeStops) {
+            os.writeInt(routeStop.stopId);
             os.writeInt(routeStop.tripId);
             os.writeShort(routeStop.postId);
             os.writeShort(routeStop.sequence);
