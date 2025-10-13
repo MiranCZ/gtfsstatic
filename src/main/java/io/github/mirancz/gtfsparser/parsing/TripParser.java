@@ -9,6 +9,10 @@ import java.util.function.Function;
 
 public class TripParser extends Parser {
 
+    private List<Trip> trips = null;
+    private List<Route> routes = null;
+    private Map<String, Integer> headsignPool;
+
     public TripParser() {
     }
 
@@ -47,15 +51,58 @@ public class TripParser extends Parser {
     @Override
     protected void onFileInternal(String name, InputStream input, Function<String, DataOutputStream> outputProvider) throws Exception {
         if (name.equals("trips.txt")) {
-            parseTrips(input, outputProvider.apply("trips"));
+            trips = parseTrips(input);
         }
 
         if (name.equals("stop_times.txt")) {
-            parseStopTimes(input, outputProvider.apply("stop_times"), outputProvider.apply("route_stops"));
+            routes = parseStopTimes(input, outputProvider.apply("stop_times"), outputProvider.apply("route_stops"));
+        }
+
+        if (trips != null && routes != null) {
+            writeTrips(outputProvider.apply("trips"));
         }
     }
 
-    private void parseStopTimes(InputStream input, DataOutputStream os, DataOutputStream routes) throws Exception {
+    private void writeTrips(DataOutputStream os) throws IOException {
+        Map<Integer, Route> tripIdToRoute = new HashMap<>();
+        for (Route route : routes) {
+            tripIdToRoute.put(route.tripId(), route);
+        }
+
+        os.writeInt(headsignPool.size());
+        for (Map.Entry<String, Integer> entry : headsignPool.entrySet()) {
+            os.writeInt(entry.getValue());
+
+            String name = entry.getKey();
+            byte[] bytes = name.getBytes(StandardCharsets.UTF_8);
+            os.writeInt(bytes.length);
+
+            os.write(bytes);
+        }
+
+        os.writeInt(trips.size());
+        for (Trip trip : trips) {
+            if (trip.serviceId > Short.MAX_VALUE || trip.lineId > Short.MAX_VALUE || trip.blockId > Short.MAX_VALUE) {
+                throw new IllegalStateException();
+            }
+
+            os.writeShort(trip.serviceId);
+            os.writeShort(trip.lineId);
+            os.writeInt(trip.headsignId);
+            os.writeShort(trip.blockId);
+            os.write(trip.data);
+
+            Route route = tripIdToRoute.get(trip.id);
+            os.writeInt(route.startPos());
+            int length = route.length;
+            if (length > Byte.MAX_VALUE) {
+                throw new IllegalStateException("Overflow for length "+length);
+            }
+            os.write(length);
+        }
+    }
+
+    private List<Route> parseStopTimes(InputStream input, DataOutputStream os, DataOutputStream routes) throws Exception {
         Csv tripsCsv = Csv.parse(input);
 
         Iterator<Csv.CsvLine> lines = tripsCsv.getLines();
@@ -67,6 +114,9 @@ public class TripParser extends Parser {
         List<RouteStop> routeStops = new ArrayList<>();
 
         int routeStopIndex = 0;
+        int lineNumber = 0;
+
+        List<Route> result = new ArrayList<>();
 
         while (lines.hasNext()) {
             Csv.CsvLine line = lines.next();
@@ -79,7 +129,7 @@ public class TripParser extends Parser {
 
 
             if (currentRoute == null) {
-                currentRoute = new Route(tripId);
+                currentRoute = new Route(tripId, lineNumber);
                 prevSequence = sequence - 1;
             }
 
@@ -97,7 +147,9 @@ public class TripParser extends Parser {
                 stopIdToRoute.computeIfAbsent(routeStop.stopId(), k -> new ArrayList<>()).add(routeStopIndex++);
                 routeStops.add(routeStop);
             } else {
-                currentRoute = new Route(tripId);
+                currentRoute.length = lineNumber-currentRoute.startPos();
+                result.add(currentRoute);
+                currentRoute = new Route(tripId, lineNumber);
 
                 RouteStop routeStop = new RouteStop(currentRoute.tripId(), stopInfo.stopId, stopInfo.postId, sequence,
                         Time.parse(line.get("arrival_time")), Time.parse(line.get("departure_time"))
@@ -107,7 +159,10 @@ public class TripParser extends Parser {
             }
 
             prevSequence = sequence;
+            lineNumber++;
+
         }
+        result.add(currentRoute);
 
         // stopId -> [tripId]
         // tripId -> [routeStop]
@@ -126,17 +181,19 @@ public class TripParser extends Parser {
         }
 
         writeTripToRoute(routes, routeStops);
+
+        return result;
     }
 
-    private void parseTrips(InputStream input, DataOutputStream os) throws IOException {
+    record Trip(int id, int serviceId, int lineId, int headsignId, int blockId, byte data) {
+    }
+
+    private List<Trip> parseTrips(InputStream input) throws IOException {
         Csv tripsCsv = Csv.parse(input);
 
         Iterator<Csv.CsvLine> lines = tripsCsv.getLines();
 
-        record Trip(int id, int serviceId, int lineId, int headsignId, int blockId, byte data) {
-        }
-
-        Map<String, Integer> headsignPool = new HashMap<>();
+        headsignPool = new HashMap<>();
         int poolId = 0;
 
         List<Trip> trips = new ArrayList<>();
@@ -172,33 +229,56 @@ public class TripParser extends Parser {
             trips.add(new Trip(id, serviceId, lineId, headsignId, blockId, data));
         }
 
-        os.writeInt(headsignPool.size());
-        for (Map.Entry<String, Integer> entry : headsignPool.entrySet()) {
-            os.writeInt(entry.getValue());
 
-            String name = entry.getKey();
-            byte[] bytes = name.getBytes(StandardCharsets.UTF_8);
-            os.writeInt(bytes.length);
-
-            os.write(bytes);
-        }
-
-        os.writeInt(trips.size());
-        for (Trip trip : trips) {
-            if (trip.serviceId > Short.MAX_VALUE || trip.lineId > Short.MAX_VALUE || trip.blockId > Short.MAX_VALUE) {
-                throw new IllegalStateException();
-            }
-
-            os.writeShort(trip.serviceId);
-            os.writeShort(trip.lineId);
-            os.writeInt(trip.headsignId);
-            os.writeShort(trip.blockId);
-            os.write(trip.data);
-        }
+        return trips;
     }
 
-    public record Route(int tripId) {
-    }
+    public static final class Route {
+        private final int tripId;
+        private final int startPos;
+        private int length = -1;
+
+        public Route(int tripId, int startPos) {
+            this.tripId = tripId;
+            this.startPos = startPos;
+        }
+
+        public int tripId() {
+            return tripId;
+        }
+
+        public int startPos() {
+            return startPos;
+        }
+
+        public int length() {
+            return length;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) return true;
+            if (obj == null || obj.getClass() != this.getClass()) return false;
+            var that = (Route) obj;
+            return this.tripId == that.tripId &&
+                    this.startPos == that.startPos &&
+                    this.length == that.length;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(tripId, startPos, length);
+        }
+
+        @Override
+        public String toString() {
+            return "Route[" +
+                    "tripId=" + tripId + ", " +
+                    "startPos=" + startPos + ", " +
+                    "length=" + length + ']';
+        }
+
+        }
 
     private record StopInfo(int stopId, int postId) {
     }
