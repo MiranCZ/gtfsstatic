@@ -38,7 +38,7 @@ public class ApiParser extends Parser {
             int lineId = Integer.parseInt(lineIdParts[0].strip());
             int routeId = Integer.parseInt(lineIdParts[1].strip());
 
-            int tripId = Integer.parseInt(parts[1].strip());
+            int tripId = Integer.parseInt(parts[1].strip())-1;
 
             if (lineId > Short.MAX_VALUE || routeId > Short.MAX_VALUE) {
                 throw new IllegalArgumentException("OOPS we got an overflow... "+lineId + " "+routeId);
