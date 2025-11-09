@@ -1,6 +1,7 @@
 package io.github.mirancz.gtfsparser.parsing;
 
-import io.github.mirancz.gtfsparser.util.StopStorage;
+import io.github.mirancz.gtfsparser.util.IdStorage;
+import io.github.mirancz.gtfsparser.util.Utils;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -47,13 +48,6 @@ public class TripParser extends Parser {
         }
     }
 
-    private static StopInfo parseStop(String stopUID) {
-        int ind = stopUID.indexOf("Z");
-        int stopId = Integer.parseInt(stopUID.substring(1, ind));
-        int postId = Integer.parseInt(stopUID.substring(ind + 1));
-
-        return new StopInfo(StopStorage.getId(stopId), postId);
-    }
 
     @Override
     protected void onFileInternal(String name, InputStream input, Function<String, DataOutputStream> outputProvider) throws Exception {
@@ -129,9 +123,9 @@ public class TripParser extends Parser {
         while (lines.hasNext()) {
             Csv.CsvLine line = lines.next();
 
-            int tripId = line.getInt("trip_id")-1;
+            int tripId = IdStorage.TRIP.getId(line.getInt("trip_id"));
 
-            var stopInfo = parseStop(line.get("stop_id"));
+            var stopInfo = Utils.parseStop(line.get("stop_id"));
 
             int sequence = line.getInt("stop_sequence");
 
@@ -148,7 +142,7 @@ public class TripParser extends Parser {
                     throw new IllegalStateException(currentRoute + " ; " + tripId + " ; " + sequence);
                 }
 
-                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId, stopInfo.stopId, stopInfo.postId, sequence,
+                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId, stopInfo.stopId(), stopInfo.postId(), sequence,
                         Time.parse(line.get("arrival_time")), Time.parse(line.get("departure_time"))
                 );
 
@@ -160,7 +154,7 @@ public class TripParser extends Parser {
                 result.add(currentRoute);
                 currentRoute = new Route(tripId, lineNumber);
 
-                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId(), stopInfo.stopId, stopInfo.postId, sequence,
+                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId(), stopInfo.stopId(), stopInfo.postId(), sequence,
                         Time.parse(line.get("arrival_time")), Time.parse(line.get("departure_time"))
                 );
                 stopIdToRoute.computeIfAbsent(routeStop.stopId(), k -> new ArrayList<>()).add(routeStopIndex++);
@@ -211,7 +205,7 @@ public class TripParser extends Parser {
         while (lines.hasNext()) {
             Csv.CsvLine line = lines.next();
 
-            int id = line.getInt("trip_id")-1;
+            int id = IdStorage.TRIP.getId(line.getInt("trip_id"));
             if (id != (expectedId++)) {
                 throw new IllegalStateException();
             }
@@ -419,8 +413,7 @@ public class TripParser extends Parser {
 
         }
 
-    private record StopInfo(int stopId, int postId) {
-    }
+
 
     private record RouteStop(int id, int tripId, int stopId, int postId, int sequence,
                              Time arrival, Time departure) {

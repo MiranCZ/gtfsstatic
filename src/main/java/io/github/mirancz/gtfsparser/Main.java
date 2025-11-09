@@ -2,12 +2,15 @@ package io.github.mirancz.gtfsparser;
 
 
 import io.github.mirancz.gtfsparser.parsing.*;
+import io.github.mirancz.gtfsparser.util.IdStorage;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.function.Function;
 import java.util.zip.ZipEntry;
@@ -19,7 +22,7 @@ public class Main {
     private static final List<Parser> parsers;
 
     static {
-        parsers = List.of(new StopParser(), new LineInfoParser(), new TripParser(), new ApiParser(), new CalendarParser());
+        parsers = List.of(new StopParser(), new LineInfoParser(), new TripParser(), new ApiParser(), new CalendarParser(), new TransfersParser());
     }
 
     public static void main(String[] args) throws IOException {
@@ -30,15 +33,7 @@ public class Main {
         InputStream stream = con.getInputStream();
 
         Function<String, DataOutputStream> outputProvider = s -> {
-            FileOutputStream fos;
-            try {
-                fos = new FileOutputStream(getFileFor(s, true));
-            } catch (FileNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-            BufferedOutputStream outputStream = new BufferedOutputStream(fos);
-
-            return new DataOutputStream(outputStream);
+            return getDataOutStream(getFileFor(s, true));
         };
         ZipInputStream zip = new ZipInputStream(stream);
 
@@ -62,7 +57,27 @@ public class Main {
 
         zip.close();
 
+        writeStopIdMaps();
+
         Files.writeString(getDataRoot().resolve("info"), generateInfoString());
+    }
+
+    private static DataOutputStream getDataOutStream(File file) {
+        FileOutputStream fos;
+        try {
+            fos = new FileOutputStream(file);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        BufferedOutputStream outputStream = new BufferedOutputStream(fos);
+
+        return new DataOutputStream(outputStream);
+    }
+
+    private static void writeStopIdMaps() throws IOException {
+        DataOutputStream os = getDataOutStream(getStopMapsFile());
+        IdStorage.STOP.write(os);
+        os.close();
     }
 
     private static String generateInfoString() {
@@ -78,6 +93,10 @@ public class Main {
         }
 
         return file.toPath();
+    }
+    
+    public static File getStopMapsFile() {
+        return getFileFor("stop_maps", true);
     }
 
     private static File getFileFor(String name, boolean generated) {
@@ -98,6 +117,35 @@ public class Main {
         }
 
         return root.resolve(name).toFile();
+    }
+
+    private static String getFileHash(File file) {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+
+        try (FileInputStream fs = new FileInputStream(file)) {
+            byte[] byteArray = new byte[8192];
+            int bytesCount;
+
+            while ((bytesCount = fs.read(byteArray)) != -1) {
+                digest.update(byteArray, 0, bytesCount);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+
+        byte[] bytes = digest.digest();
+
+        StringBuilder str = new StringBuilder();
+        for (byte b : bytes) {
+            str.append(String.format("%02x", b));
+        }
+
+        return str.toString();
     }
 
 
