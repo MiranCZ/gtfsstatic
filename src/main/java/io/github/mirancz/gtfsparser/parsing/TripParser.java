@@ -1,5 +1,7 @@
 package io.github.mirancz.gtfsparser.parsing;
 
+import io.github.mirancz.gtfsparser.util.StopStorage;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,7 +19,11 @@ public class TripParser extends Parser {
     }
 
     private static void writeTripToRoute(DataOutputStream os, List<RouteStop> routeStops) throws IOException {
-        for (RouteStop routeStop : routeStops) {
+        for (int i = 0; i < routeStops.size(); i++) {
+            RouteStop routeStop = routeStops.get(i);
+
+            if (i != routeStop.id) throw new IllegalStateException();
+
             os.writeInt(routeStop.stopId);
             os.writeInt(routeStop.tripId);
             os.writeShort(routeStop.postId);
@@ -46,7 +52,7 @@ public class TripParser extends Parser {
         int stopId = Integer.parseInt(stopUID.substring(1, ind));
         int postId = Integer.parseInt(stopUID.substring(ind + 1));
 
-        return new StopInfo(stopId, postId);
+        return new StopInfo(StopStorage.getId(stopId), postId);
     }
 
     @Override
@@ -61,6 +67,7 @@ public class TripParser extends Parser {
 
         if (trips != null && routes != null) {
             writeTrips(outputProvider.apply("trips"));
+            writeStopIdToRoute(outputProvider.apply("stop_to_route"));
         }
     }
 
@@ -141,18 +148,19 @@ public class TripParser extends Parser {
                     throw new IllegalStateException(currentRoute + " ; " + tripId + " ; " + sequence);
                 }
 
-                RouteStop routeStop = new RouteStop(currentRoute.tripId, stopInfo.stopId, stopInfo.postId, sequence,
+                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId, stopInfo.stopId, stopInfo.postId, sequence,
                         Time.parse(line.get("arrival_time")), Time.parse(line.get("departure_time"))
                 );
 
                 stopIdToRoute.computeIfAbsent(routeStop.stopId(), k -> new ArrayList<>()).add(routeStopIndex++);
                 routeStops.add(routeStop);
+                currentRoute.stops.add(routeStop);
             } else {
                 currentRoute.length = lineNumber-currentRoute.startPos();
                 result.add(currentRoute);
                 currentRoute = new Route(tripId, lineNumber);
 
-                RouteStop routeStop = new RouteStop(currentRoute.tripId(), stopInfo.stopId, stopInfo.postId, sequence,
+                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId(), stopInfo.stopId, stopInfo.postId, sequence,
                         Time.parse(line.get("arrival_time")), Time.parse(line.get("departure_time"))
                 );
                 stopIdToRoute.computeIfAbsent(routeStop.stopId(), k -> new ArrayList<>()).add(routeStopIndex++);
@@ -231,17 +239,147 @@ public class TripParser extends Parser {
         }
 
 
+
         return trips;
+    }
+
+    private void writeStopIdToRoute(DataOutputStream os) throws IOException {
+        List<RoutesContainer> routeContainers = parseContainers();
+
+        int max = 0;
+        for (RoutesContainer cont : routeContainers) {
+            for (RouteStopsContainer stop : cont.stops()) {
+                int id = stop.stopId();
+                max = Math.max(max, id);
+            }
+        }
+
+        List<RouteStopsContainer>[] map = new List[max+1];
+
+        for (RoutesContainer cont : routeContainers) {
+            for (RouteStopsContainer stop : cont.stops()) {
+                int id = stop.stopId();
+
+                if (map[id] == null) {
+                    map[id] = new ArrayList<>();
+                }
+                map[id].add(stop);
+            }
+        }
+
+        os.writeInt(map.length);
+
+        for (List<RouteStopsContainer> routeStopsContainers : map) {
+            if (routeStopsContainers == null) {
+                os.writeInt(0);
+                continue;
+            }
+            os.writeInt(routeStopsContainers.size());
+            for (RouteStopsContainer container : routeStopsContainers) {
+                os.writeInt(container.stopId);
+                os.writeShort(container.postId);
+                os.writeShort(container.serviceId);
+                writeTime(os, container.startTime);
+
+                if (container.stops.length > Short.MAX_VALUE) {
+                    throw new IllegalStateException();
+                }
+                os.writeShort(container.stops.length);
+
+                for (long stop : container.stops) {
+                    os.writeLong(stop);
+                }
+            }
+        }
+    }
+
+    private List<RoutesContainer> parseContainers() {
+        record Entry(List<Long> stops) {
+
+
+            static Entry of(List<RouteStop> rs) {
+                return new Entry(rs.stream().map(s -> ((long)s.stopId()<<32) | (s.postId() & 0xFFFFFFL)).toList());
+            }
+
+            @Override
+            public int hashCode() {
+                return Objects.hash(stops);
+            }
+
+            @Override
+            public boolean equals(Object object) {
+                if (!(object instanceof Entry entry)) return false;
+                return Objects.equals(stops, entry.stops);
+            }
+        }
+
+        Map<Entry, List<List<RouteStop>>> map = new HashMap<>();
+
+        for (Route route : routes) {
+            Entry entry = Entry.of(route.stops);
+
+            if (map.containsKey(entry)) {
+                map.get(entry).add(route.stops);
+            } else {
+                map.put(entry, new ArrayList<>(List.of(route.stops)));
+            }
+        }
+
+        List<RoutesContainer> routeContainers = new ArrayList<>();
+
+        int routeID = 0;
+
+        for (List<List<RouteStop>> value : map.values()) {
+            value.sort(Comparator.comparing(l -> l.getFirst().departure()));
+
+            List<RouteStopsContainer> containers = new ArrayList<>();
+            for (int i = 0; i < value.getFirst().size(); i++) {
+                int stopId = value.getFirst().get(i).stopId();
+                int postId = value.getFirst().get(i).postId();
+                int serviceId = trips.get(value.getFirst().get(i).tripId()).serviceId();
+
+                Time startTime = value.getFirst().get(i).departure();
+                long[] stops = new long[value.size()-1];
+
+                for (int j = 1; j < value.size(); j++) {
+                    List<RouteStop> routeStops = value.get(j);
+                    RouteStop stop = routeStops.get(i);
+
+                    if (stop.stopId() != stopId || stop.postId() != postId) {
+                        for (List<RouteStop> r : value) {
+                            System.out.println(r.stream().map(s -> (s.stopId()+":"+s.postId())).toList());
+                        }
+                        throw new IllegalStateException();
+                    }
+
+                    long data = ((long) stop.id()<<32) | (stop.departure().getMinsDiff(startTime) & 0xFFFFFFFFL);
+
+                    stops[j-1] = data;
+                }
+                if (postId > Short.MAX_VALUE || serviceId >  Short.MAX_VALUE) {
+                    throw new IllegalStateException();
+                }
+
+                RouteStopsContainer container = new RouteStopsContainer(stopId, (short) postId, (short) serviceId, startTime, stops);
+                containers.add(container);
+            }
+
+            routeContainers.add(new RoutesContainer(routeID++, containers));
+        }
+
+        return routeContainers;
     }
 
     public static final class Route {
         private final int tripId;
         private final int startPos;
+        private final List<RouteStop> stops;
         private int length = -1;
 
         public Route(int tripId, int startPos) {
             this.tripId = tripId;
             this.startPos = startPos;
+            this.stops = new ArrayList<>();
         }
 
         public int tripId() {
@@ -284,11 +422,11 @@ public class TripParser extends Parser {
     private record StopInfo(int stopId, int postId) {
     }
 
-    private record RouteStop(int tripId, int stopId, int postId, int sequence,
+    private record RouteStop(int id, int tripId, int stopId, int postId, int sequence,
                              Time arrival, Time departure) {
     }
 
-    public record Time(int hours, int minutes, int second) {
+    public record Time(int hours, int minutes, int second) implements Comparable<Time> {
 
         public static Time parse(String time) {
             String[] parts = time.split(":");
@@ -301,6 +439,27 @@ public class TripParser extends Parser {
         }
 
 
+        public int getMinsDiff(Time other) {
+            return (hours - other.hours) * 60 + (minutes - other.minutes);
+        }
+
+        @Override
+        public int compareTo(Time o) {
+            if (hours == o.hours) {
+                return minutes - o.minutes;
+            }
+            return hours - o.hours;
+        }
     }
+
+    public record RoutesContainer(int id, List<RouteStopsContainer> stops) {
+    }
+
+    /**
+     * @param stops An array of packed ints in the form of {@code (routeStopId<<32 | minOffset)}
+     */
+    public record RouteStopsContainer(int stopId, short postId, short serviceId, Time startTime, long[] stops) {
+    }
+
 
 }

@@ -2,6 +2,8 @@ package io.github.mirancz.gtfsparser.parsing;
 
 
 
+import io.github.mirancz.gtfsparser.util.StopStorage;
+
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -22,7 +24,7 @@ public class StopParser extends Parser {
 
         while (lines.hasNext()) {
             Csv.CsvLine line = lines.next();
-            int stopId = parseStopId(line.get("stop_id"));
+            int stopId = StopStorage.getId(parseStopId(line.get("stop_id")));
             if (processed.contains(stopId)) continue;
             processed.add(stopId);
 
