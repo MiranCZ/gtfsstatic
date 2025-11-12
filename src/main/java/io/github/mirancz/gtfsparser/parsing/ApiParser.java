@@ -1,5 +1,6 @@
 package io.github.mirancz.gtfsparser.parsing;
 
+import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
 import io.github.mirancz.gtfsparser.util.IdStorage;
 import io.github.mirancz.gtfsparser.util.Pair;
 
@@ -17,7 +18,7 @@ public class ApiParser extends Parser {
         subscribeTransformer("api.txt", "api", this::parseAndWrite);
     }
 
-    protected void parseAndWrite(InputStream input, DataOutputStream output) throws Exception {
+    protected void parseAndWrite(InputStream input, CheckedOutputStream output) throws Exception {
         Scanner scanner = new Scanner(input);
 
 
@@ -40,10 +41,6 @@ public class ApiParser extends Parser {
             int routeId = Integer.parseInt(lineIdParts[1].strip());
 
             int tripId = IdStorage.TRIP.getId(Integer.parseInt(parts[1].strip()));
-
-            if (lineId > Short.MAX_VALUE || routeId > Short.MAX_VALUE) {
-                throw new IllegalArgumentException("OOPS we got an overflow... "+lineId + " "+routeId);
-            }
 
             result.add(new Pair<>(tripId, ((lineId<<16) | routeId)));
         }

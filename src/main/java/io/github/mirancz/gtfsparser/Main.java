@@ -2,15 +2,18 @@ package io.github.mirancz.gtfsparser;
 
 
 import io.github.mirancz.gtfsparser.parsing.*;
+import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
 import io.github.mirancz.gtfsparser.util.IdStorage;
+import org.tukaani.xz.LZMA2Options;
+import org.tukaani.xz.XZInputStream;
+import org.tukaani.xz.XZOutputStream;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.function.Function;
 import java.util.zip.ZipEntry;
@@ -32,8 +35,11 @@ public class Main {
 
         InputStream stream = con.getInputStream();
 
-        Function<String, DataOutputStream> outputProvider = s -> {
-            return getDataOutStream(getFileFor(s, true));
+        XZOutputStream compressedOutput = new XZOutputStream(new FileOutputStream(getDataRoot().resolve("data").toFile()), new LZMA2Options());
+        DataOutputStream output = new DataOutputStream(compressedOutput);
+
+        Function<String, CheckedOutputStream> outputProvider = s -> {
+            return getWrappedDataOutputStream(s, output);
         };
         ZipInputStream zip = new ZipInputStream(stream);
 
@@ -47,8 +53,6 @@ public class Main {
                 parser.onFile(name, bif, outputProvider);
                 bif.reset();
             }
-
-            Files.write(getFileFor(entry.getName(), false).toPath(), bif.readAllBytes());
         }
 
         for (Parser parser : parsers) {
@@ -57,9 +61,42 @@ public class Main {
 
         zip.close();
 
-        writeStopIdMaps();
+        writeStopIdMaps(outputProvider);
+        writePosts(outputProvider);
+
+        output.writeBoolean(false);
+        output.close();
 
         Files.writeString(getDataRoot().resolve("info"), generateInfoString());
+    }
+
+    private static void writePosts(Function<String, CheckedOutputStream> outputProvider) throws IOException {
+        CheckedOutputStream os = outputProvider.apply("posts");
+
+        os.write(Files.readAllBytes(getDataRoot().resolve("parsed").resolve("posts")));
+
+        os.close();
+    }
+
+    private static CheckedOutputStream getWrappedDataOutputStream(String s, DataOutputStream output) {
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+
+        return new CheckedOutputStream(os) {
+            @Override
+            public void close() throws IOException {
+                byte[] data = os.toByteArray();
+
+                output.writeBoolean(true);
+
+                byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
+                output.writeInt(bytes.length);
+                output.write(bytes);
+
+                output.writeInt(data.length);
+                output.write(data);
+                super.close();
+            }
+        };
     }
 
     private static DataOutputStream getDataOutStream(File file) {
@@ -74,10 +111,13 @@ public class Main {
         return new DataOutputStream(outputStream);
     }
 
-    private static void writeStopIdMaps() throws IOException {
-        DataOutputStream os = getDataOutStream(getStopMapsFile());
+    private static void writeStopIdMaps(Function<String, CheckedOutputStream> outputProvider) throws IOException {
+        CheckedOutputStream os = outputProvider.apply("stop_mapping");
+
         IdStorage.STOP.write(os);
+
         os.close();
+
     }
 
     private static String generateInfoString() {
@@ -96,56 +136,7 @@ public class Main {
     }
     
     public static File getStopMapsFile() {
-        return getFileFor("stop_maps", true);
-    }
-
-    private static File getFileFor(String name, boolean generated) {
-        Path root = getDataRoot();
-        if (generated) {
-            root = root.resolve("parsed");
-            if (!Files.exists(root)) {
-                root.toFile().mkdir();
-            }
-        } else {
-            root = root.resolve("unzipped");
-            if (!Files.exists(root)) {
-                root.toFile().mkdir();
-            }
-        }
-        if (name.contains(".")) {
-           name = name.substring(0, name.lastIndexOf('.'));
-        }
-
-        return root.resolve(name).toFile();
-    }
-
-    private static String getFileHash(File file) {
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-
-        try (FileInputStream fs = new FileInputStream(file)) {
-            byte[] byteArray = new byte[8192];
-            int bytesCount;
-
-            while ((bytesCount = fs.read(byteArray)) != -1) {
-                digest.update(byteArray, 0, bytesCount);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-
-        byte[] bytes = digest.digest();
-
-        StringBuilder str = new StringBuilder();
-        for (byte b : bytes) {
-            str.append(String.format("%02x", b));
-        }
-
-        return str.toString();
+        return getDataRoot().resolve("stop_maps").toFile();
     }
 
 

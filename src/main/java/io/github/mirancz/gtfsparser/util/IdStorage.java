@@ -53,7 +53,7 @@ public class IdStorage {
             return idToIndex.computeIfAbsent(original, k -> ID++);
         }
 
-        public void write(DataOutputStream os) throws IOException {
+        public void write(CheckedOutputStream os) throws IOException {
             os.writeInt(idToIndex.size());
 
             int[] ids = new int[idToIndex.size()];

@@ -1,5 +1,7 @@
 package io.github.mirancz.gtfsparser.parsing;
 
+import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
+
 import java.awt.*;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -13,7 +15,7 @@ public class LineInfoParser extends Parser {
         subscribeTransformer("routes.txt", "lines", this::parseAndWrite);
     }
 
-    protected void parseAndWrite(InputStream input, DataOutputStream output) throws Exception {
+    protected void parseAndWrite(InputStream input, CheckedOutputStream output) throws Exception {
         Csv stops = Csv.parse(input);
 
         Iterator<Csv.CsvLine> lines = stops.getLines();
@@ -30,9 +32,7 @@ public class LineInfoParser extends Parser {
 
             output.writeInt(routeId);
 
-            byte[] bytes = name.getBytes(StandardCharsets.UTF_8);
-            output.writeInt(bytes.length);
-            output.write(bytes);
+            output.writeString(name);
 
             writeColor(output, backgroundColor);
             writeColor(output, textColor);
@@ -40,7 +40,7 @@ public class LineInfoParser extends Parser {
         output.writeBoolean(false);
     }
 
-    private static void writeColor(DataOutputStream output, Color backgroundColor) throws IOException {
+    private static void writeColor(CheckedOutputStream output, Color backgroundColor) throws IOException {
         output.write(backgroundColor.getRed());
         output.write(backgroundColor.getGreen());
         output.write(backgroundColor.getBlue());

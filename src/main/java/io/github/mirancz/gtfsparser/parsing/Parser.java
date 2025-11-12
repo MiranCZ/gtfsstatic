@@ -1,5 +1,6 @@
 package io.github.mirancz.gtfsparser.parsing;
 
+import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
 import io.github.mirancz.gtfsparser.util.Pair;
 
 import java.io.DataOutputStream;
@@ -16,13 +17,13 @@ public abstract class Parser {
     private final Map<String, Pair<String, Transformer>> transformers = new HashMap<>();
     private final Map<String, Consumer<InputStream>> readers = new HashMap<>();
 
-    public final void onFile(String name, InputStream input, Function<String, DataOutputStream> outputProvider) {
+    public final void onFile(String name, InputStream input, Function<String, CheckedOutputStream> outputProvider) {
         try(WrappedOutputProvider wrapped = new WrappedOutputProvider(outputProvider)) {
             onFileInternal(name, input, wrapped::generate);
 
             if (transformers.containsKey(name)) {
                 var pair = transformers.get(name);
-                DataOutputStream os = wrapped.generate(pair.left());
+                CheckedOutputStream os = wrapped.generate(pair.left());
                 pair.right().call(input, os);
             }
             if (readers.containsKey(name)) {
@@ -34,7 +35,7 @@ public abstract class Parser {
         }
     }
 
-    public final void onFinish(Function<String, DataOutputStream> outputProvider) {
+    public final void onFinish(Function<String, CheckedOutputStream> outputProvider) {
         try(WrappedOutputProvider wrapped = new WrappedOutputProvider(outputProvider)) {
             onFinishInternal(wrapped::generate);
         } catch (Exception e) {
@@ -50,28 +51,28 @@ public abstract class Parser {
         transformers.put(name, new Pair<>(outputName, transformer));
     }
 
-    protected void onFinishInternal(Function<String, DataOutputStream> outputProvider) throws Exception {
+    protected void onFinishInternal(Function<String, CheckedOutputStream> outputProvider) throws Exception {
     }
 
-    protected void onFileInternal(String name, InputStream input, Function<String, DataOutputStream> outputProvider) throws Exception {
+    protected void onFileInternal(String name, InputStream input, Function<String, CheckedOutputStream> outputProvider) throws Exception {
     }
 
     @FunctionalInterface
     protected interface Transformer {
-        void call(InputStream inputStream, DataOutputStream output) throws Exception;
+        void call(InputStream inputStream, CheckedOutputStream output) throws Exception;
     }
 
     private static class WrappedOutputProvider implements AutoCloseable {
 
-        private final List<DataOutputStream> streams = new ArrayList<>();
-        private final Function<String, DataOutputStream> provider;
+        private final List<CheckedOutputStream> streams = new ArrayList<>();
+        private final Function<String, CheckedOutputStream> provider;
 
-        public WrappedOutputProvider(Function<String, DataOutputStream> provider) {
+        public WrappedOutputProvider(Function<String, CheckedOutputStream> provider) {
             this.provider = provider;
         }
 
-        public DataOutputStream generate(String s) {
-            DataOutputStream generated = provider.apply(s);
+        public CheckedOutputStream generate(String s) {
+            CheckedOutputStream generated = provider.apply(s);
 
             streams.add(generated);
 
@@ -81,7 +82,7 @@ public abstract class Parser {
 
         @Override
         public void close() throws Exception {
-            for (DataOutputStream stream : streams) {
+            for (CheckedOutputStream stream : streams) {
                 stream.close();
             }
         }

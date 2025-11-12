@@ -1,9 +1,9 @@
 package io.github.mirancz.gtfsparser.parsing;
 
+import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
 import io.github.mirancz.gtfsparser.util.IdStorage;
 import io.github.mirancz.gtfsparser.util.Utils;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -19,7 +19,7 @@ public class TripParser extends Parser {
     public TripParser() {
     }
 
-    private static void writeTripToRoute(DataOutputStream os, List<RouteStop> routeStops) throws IOException {
+    private static void writeTripToRoute(CheckedOutputStream os, List<RouteStop> routeStops) throws IOException {
         for (int i = 0; i < routeStops.size(); i++) {
             RouteStop routeStop = routeStops.get(i);
 
@@ -35,13 +35,9 @@ public class TripParser extends Parser {
         }
     }
 
-    private static void writeTime(DataOutputStream os, Time time) throws IOException {
-        if (time.hours > Byte.MAX_VALUE) {
-            throw new IllegalStateException("Possible overflow for time "+time);
-        }
-
-        os.write(time.hours);
-        os.write(time.minutes);
+    private static void writeTime(CheckedOutputStream os, Time time) throws IOException {
+        os.writeByte(time.hours);
+        os.writeByte(time.minutes);
 
         if (time.second != 0) {
             throw new IllegalStateException("Wrongly assumed seconds would be zero!");
@@ -50,7 +46,7 @@ public class TripParser extends Parser {
 
 
     @Override
-    protected void onFileInternal(String name, InputStream input, Function<String, DataOutputStream> outputProvider) throws Exception {
+    protected void onFileInternal(String name, InputStream input, Function<String, CheckedOutputStream> outputProvider) throws Exception {
         if (name.equals("trips.txt")) {
             trips = parseTrips(input);
         }
@@ -65,7 +61,7 @@ public class TripParser extends Parser {
         }
     }
 
-    private void writeTrips(DataOutputStream os) throws IOException {
+    private void writeTrips(CheckedOutputStream os) throws IOException {
         Map<Integer, Route> tripIdToRoute = new HashMap<>();
         for (Route route : routes) {
             tripIdToRoute.put(route.tripId(), route);
@@ -76,35 +72,27 @@ public class TripParser extends Parser {
             os.writeInt(entry.getValue());
 
             String name = entry.getKey();
-            byte[] bytes = name.getBytes(StandardCharsets.UTF_8);
-            os.writeInt(bytes.length);
-
-            os.write(bytes);
+            
+            os.writeString(name); 
         }
 
         os.writeInt(trips.size());
         for (Trip trip : trips) {
-            if (trip.serviceId > Short.MAX_VALUE || trip.lineId > Short.MAX_VALUE || trip.blockId > Short.MAX_VALUE) {
-                throw new IllegalStateException();
-            }
-
             os.writeShort(trip.serviceId);
             os.writeShort(trip.lineId);
             os.writeInt(trip.headsignId);
             os.writeShort(trip.blockId);
-            os.write(trip.data);
+            os.writeByte(trip.data);
 
             Route route = tripIdToRoute.get(trip.id);
             os.writeInt(route.startPos());
             int length = route.length;
-            if (length > Byte.MAX_VALUE) {
-                throw new IllegalStateException("Overflow for length "+length);
-            }
-            os.write(length);
+
+            os.writeByte(length);
         }
     }
 
-    private List<Route> parseStopTimes(InputStream input, DataOutputStream os, DataOutputStream routes) throws Exception {
+    private List<Route> parseStopTimes(InputStream input, CheckedOutputStream os, CheckedOutputStream routes) throws Exception {
         Csv tripsCsv = Csv.parse(input);
 
         Iterator<Csv.CsvLine> lines = tripsCsv.getLines();
@@ -237,7 +225,7 @@ public class TripParser extends Parser {
         return trips;
     }
 
-    private void writeStopIdToRoute(DataOutputStream os) throws IOException {
+    private void writeStopIdToRoute(CheckedOutputStream os) throws IOException {
         List<RoutesContainer> routeContainers = parseContainers();
 
         int max = 0;
@@ -275,9 +263,6 @@ public class TripParser extends Parser {
                 os.writeShort(container.serviceId);
                 writeTime(os, container.startTime);
 
-                if (container.stops.length > Short.MAX_VALUE) {
-                    throw new IllegalStateException();
-                }
                 os.writeShort(container.stops.length);
 
                 for (long stop : container.stops) {
@@ -349,9 +334,6 @@ public class TripParser extends Parser {
                     long data = ((long) stop.id()<<32) | (stop.departure().getMinsDiff(startTime) & 0xFFFFFFFFL);
 
                     stops[j-1] = data;
-                }
-                if (postId > Short.MAX_VALUE || serviceId >  Short.MAX_VALUE) {
-                    throw new IllegalStateException();
                 }
 
                 RouteStopsContainer container = new RouteStopsContainer(stopId, (short) postId, (short) serviceId, startTime, stops);

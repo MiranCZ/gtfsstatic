@@ -1,5 +1,7 @@
 package io.github.mirancz.gtfsparser.parsing;
 
+import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
+
 import java.io.DataOutputStream;
 import java.io.InputStream;
 import java.util.Iterator;
@@ -12,7 +14,7 @@ public class CalendarParser extends Parser {
         subscribeTransformer("calendar_dates.txt", "calendar_dates", this::parseAndWriteDates);
     }
 
-    protected void parseAndWriteDates(InputStream input, DataOutputStream output) throws Exception {
+    protected void parseAndWriteDates(InputStream input, CheckedOutputStream output) throws Exception {
         Csv entries = Csv.parse(input);
 
         Iterator<Csv.CsvLine> lines = entries.getLines();
@@ -27,10 +29,6 @@ public class CalendarParser extends Parser {
 
             int type = line.getInt("exception_type");
 
-            if (serviceId > Short.MAX_VALUE || type > Byte.MAX_VALUE) {
-                throw new IllegalStateException("Calendar date overflow! "+serviceId + " ; "+type);
-            }
-
             output.writeShort(serviceId);
             output.writeInt(parseDate(date));
             output.writeByte(type);
@@ -39,7 +37,7 @@ public class CalendarParser extends Parser {
         output.writeBoolean(false);
     }
 
-    protected void parseAndWriteCalendar(InputStream input, DataOutputStream output) throws Exception {
+    protected void parseAndWriteCalendar(InputStream input, CheckedOutputStream output) throws Exception {
         Csv entries = Csv.parse(input);
 
         Iterator<Csv.CsvLine> lines = entries.getLines();
@@ -71,14 +69,10 @@ public class CalendarParser extends Parser {
             if (saturday)  data |= 1 << 5;
             if (sunday)    data |= 1 << 6;
 
-            if (serviceId > Short.MAX_VALUE) {
-                throw new IllegalArgumentException("Service id overflow! "+serviceId);
-            }
-
             output.writeShort(serviceId);
             output.writeInt(parseDate(startDate));
             output.writeInt(parseDate(endDate));
-            output.write(data);
+            output.writeByte(data);
         }
 
         output.writeBoolean(false);
@@ -89,11 +83,6 @@ public class CalendarParser extends Parser {
         int month = Integer.parseInt(date.substring(date.length()-4, date.length()-2));
 
         int year = Integer.parseInt(date.substring(0, 4));
-
-
-        if (day > Byte.MAX_VALUE || month > Byte.MAX_VALUE || year > Short.MAX_VALUE) {
-            throw new IllegalArgumentException("date overflow "+date);
-        }
 
         return (year << 16) | (month<<8) | day;
     }

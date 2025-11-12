@@ -1,5 +1,6 @@
 package io.github.mirancz.gtfsparser.parsing;
 
+import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
 import io.github.mirancz.gtfsparser.util.IdStorage;
 
 import java.io.*;
@@ -15,7 +16,7 @@ public class StopParser extends Parser {
         subscribeTransformer("stops.txt", "stops", this::parseAndWrite);
     }
 
-    public void parseAndWrite(InputStream input, DataOutputStream output) throws IOException {
+    public void parseAndWrite(InputStream input, CheckedOutputStream output) throws IOException {
         Csv stops = Csv.parse(input);
 
         Iterator<Csv.CsvLine> lines = stops.getLines();
@@ -32,9 +33,7 @@ public class StopParser extends Parser {
 
             output.writeInt(stopId);
 
-            byte[] bytes = stopName.getBytes(StandardCharsets.UTF_8);
-            output.writeInt(bytes.length);
-            output.write(bytes);
+            output.writeString(stopName);
 
             output.writeDouble(line.getDouble("stop_lat"));
             output.writeDouble(line.getDouble("stop_lon"));

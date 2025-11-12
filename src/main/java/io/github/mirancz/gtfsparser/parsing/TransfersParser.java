@@ -1,5 +1,6 @@
 package io.github.mirancz.gtfsparser.parsing;
 
+import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
 import io.github.mirancz.gtfsparser.util.IdStorage;
 import io.github.mirancz.gtfsparser.util.StopInfo;
 import io.github.mirancz.gtfsparser.util.Utils;
@@ -17,7 +18,7 @@ public class TransfersParser extends Parser {
         subscribeTransformer("transfers.txt", "transfers", this::parseAndWrite);
     }
 
-    protected void parseAndWrite(InputStream input, DataOutputStream output) throws Exception {
+    protected void parseAndWrite(InputStream input, CheckedOutputStream output) throws Exception {
         Csv entries = Csv.parse(input);
 
         Iterator<Csv.CsvLine> lines = entries.getLines();
@@ -71,7 +72,7 @@ public class TransfersParser extends Parser {
             this.minTransferTime = minTransferTime;
         }
 
-        void write(DataOutputStream os) throws IOException {
+        void write(CheckedOutputStream os) throws IOException {
             from.write(os);
             to.write(os);
             os.writeByte(transferType);
@@ -94,7 +95,7 @@ public class TransfersParser extends Parser {
         }
 
         @Override
-        void write(DataOutputStream os) throws IOException {
+        void write(CheckedOutputStream os) throws IOException {
             super.write(os);
 
             os.writeInt(fromTrip);
