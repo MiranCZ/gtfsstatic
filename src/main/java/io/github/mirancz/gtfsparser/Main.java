@@ -5,7 +5,6 @@ import io.github.mirancz.gtfsparser.parsing.*;
 import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
 import io.github.mirancz.gtfsparser.util.IdStorage;
 import org.tukaani.xz.LZMA2Options;
-import org.tukaani.xz.XZInputStream;
 import org.tukaani.xz.XZOutputStream;
 
 import java.io.*;
@@ -73,7 +72,7 @@ public class Main {
     private static void writePosts(Function<String, CheckedOutputStream> outputProvider) throws IOException {
         CheckedOutputStream os = outputProvider.apply("posts");
 
-        os.write(Files.readAllBytes(getDataRoot().resolve("parsed").resolve("posts")));
+        os.write(Files.readAllBytes(getDataRoot().resolve("storage").resolve("posts")));
 
         os.close();
     }
@@ -113,11 +112,12 @@ public class Main {
 
     private static void writeStopIdMaps(Function<String, CheckedOutputStream> outputProvider) throws IOException {
         CheckedOutputStream os = outputProvider.apply("stop_mapping");
-
         IdStorage.STOP.write(os);
-
         os.close();
 
+        DataOutputStream s = getDataOutStream(getStopMapsFile());
+        IdStorage.STOP.write(new CheckedOutputStream(s));
+        s.close();
     }
 
     private static String generateInfoString() {
@@ -136,7 +136,7 @@ public class Main {
     }
     
     public static File getStopMapsFile() {
-        return getDataRoot().resolve("stop_maps").toFile();
+        return getDataRoot().resolve("storage").resolve("stop_maps").toFile();
     }
 
 
