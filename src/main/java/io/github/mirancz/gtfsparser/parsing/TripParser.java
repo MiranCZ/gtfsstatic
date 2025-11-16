@@ -15,6 +15,7 @@ public class TripParser extends Parser {
     private List<Trip> trips = null;
     private List<Route> routes = null;
     private Map<String, Integer> headsignPool;
+    private boolean wrote = false;
 
     public TripParser() {
     }
@@ -55,9 +56,10 @@ public class TripParser extends Parser {
             routes = parseStopTimes(input, outputProvider.apply("stop_times"), outputProvider.apply("route_stops"));
         }
 
-        if (trips != null && routes != null) {
+        if (trips != null && routes != null && !wrote) {
             writeTrips(outputProvider.apply("trips"));
             writeStopIdToRoute(outputProvider.apply("stop_to_route"));
+            wrote = true;
         }
     }
 
@@ -258,7 +260,7 @@ public class TripParser extends Parser {
             }
             os.writeInt(routeStopsContainers.size());
             for (RouteStopsContainer container : routeStopsContainers) {
-                os.writeShort(container.stopId);
+                os.writeShort(container.stopId); // FIXME not needed, just equal to the index
                 os.writeShort(container.postId);
                 os.writeShort(container.serviceId);
                 writeTime(os, container.startTime);
@@ -273,29 +275,29 @@ public class TripParser extends Parser {
     }
 
     private List<RoutesContainer> parseContainers() {
-        record Entry(List<Long> stops) {
+        record Entry(List<Long> stops, int serviceId) {
 
 
-            static Entry of(List<RouteStop> rs) {
-                return new Entry(rs.stream().map(s -> ((long)s.stopId()<<32) | (s.postId() & 0xFFFFFFL)).toList());
+            static Entry of(List<RouteStop> rs, int serviceId) {
+                return new Entry(rs.stream().map(s -> ((long)s.stopId()<<32) | (s.postId() & 0xFFFFFFL)).toList(), serviceId);
             }
 
             @Override
             public int hashCode() {
-                return Objects.hash(stops);
+                return Objects.hash(stops, serviceId);
             }
 
             @Override
             public boolean equals(Object object) {
-                if (!(object instanceof Entry entry)) return false;
-                return Objects.equals(stops, entry.stops);
+                if (!(object instanceof Entry(List<Long> otherStops, int id))) return false;
+                return Objects.equals(stops, otherStops) && this.serviceId == id;
             }
         }
 
         Map<Entry, List<List<RouteStop>>> map = new HashMap<>();
 
         for (Route route : routes) {
-            Entry entry = Entry.of(route.stops);
+            Entry entry = Entry.of(route.stops, trips.get(route.tripId).serviceId);
 
             if (map.containsKey(entry)) {
                 map.get(entry).add(route.stops);
