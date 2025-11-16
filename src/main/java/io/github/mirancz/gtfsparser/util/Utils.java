@@ -7,7 +7,13 @@ public class Utils {
         int stopId = Integer.parseInt(stopUID.substring(1, ind));
         int postId = Integer.parseInt(stopUID.substring(ind + 1));
 
-        return new StopInfo(IdStorage.STOP.getId(stopId), postId);
+        int mappedStopId = IdStorage.STOP.getId(stopId);
+
+        if (mappedStopId > Short.MAX_VALUE || postId > Short.MAX_VALUE) {
+            throw new IllegalStateException();
+        }
+
+        return new StopInfo((short) mappedStopId, (short) postId);
     }
 
 

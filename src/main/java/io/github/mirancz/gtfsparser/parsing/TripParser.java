@@ -25,7 +25,7 @@ public class TripParser extends Parser {
 
             if (i != routeStop.id) throw new IllegalStateException();
 
-            os.writeInt(routeStop.stopId);
+            os.writeShort(routeStop.stopId);
             os.writeInt(routeStop.tripId);
             os.writeShort(routeStop.postId);
             os.writeShort(routeStop.sequence);
@@ -100,7 +100,7 @@ public class TripParser extends Parser {
         Route currentRoute = null;
         int prevSequence = -1;
 
-        Map<Integer, List<Integer>> stopIdToRoute = new HashMap<>();
+        Map<Short, List<Integer>> stopIdToRoute = new HashMap<>();
         List<RouteStop> routeStops = new ArrayList<>();
 
         int routeStopIndex = 0;
@@ -160,9 +160,9 @@ public class TripParser extends Parser {
 
         os.writeInt(stopIdToRoute.size());
 
-        for (Map.Entry<Integer, List<Integer>> entry : stopIdToRoute.entrySet()) {
-            int stopId = entry.getKey();
-            os.writeInt(stopId);
+        for (Map.Entry<Short, List<Integer>> entry : stopIdToRoute.entrySet()) {
+            short stopId = entry.getKey();
+            os.writeShort(stopId);
 
             var list = entry.getValue();
             os.writeInt(list.size());
@@ -258,7 +258,7 @@ public class TripParser extends Parser {
             }
             os.writeInt(routeStopsContainers.size());
             for (RouteStopsContainer container : routeStopsContainers) {
-                os.writeInt(container.stopId);
+                os.writeShort(container.stopId);
                 os.writeShort(container.postId);
                 os.writeShort(container.serviceId);
                 writeTime(os, container.startTime);
@@ -313,8 +313,8 @@ public class TripParser extends Parser {
 
             List<RouteStopsContainer> containers = new ArrayList<>();
             for (int i = 0; i < value.getFirst().size(); i++) {
-                int stopId = value.getFirst().get(i).stopId();
-                int postId = value.getFirst().get(i).postId();
+                short stopId = value.getFirst().get(i).stopId();
+                short postId = value.getFirst().get(i).postId();
                 int serviceId = trips.get(value.getFirst().get(i).tripId()).serviceId();
 
                 Time startTime = value.getFirst().get(i).departure();
@@ -336,7 +336,7 @@ public class TripParser extends Parser {
                     stops[j-1] = data;
                 }
 
-                RouteStopsContainer container = new RouteStopsContainer(stopId, (short) postId, (short) serviceId, startTime, stops);
+                RouteStopsContainer container = new RouteStopsContainer(stopId, postId, (short) serviceId, startTime, stops);
                 containers.add(container);
             }
 
@@ -397,7 +397,7 @@ public class TripParser extends Parser {
 
 
 
-    private record RouteStop(int id, int tripId, int stopId, int postId, int sequence,
+    private record RouteStop(int id, int tripId, short stopId, short postId, int sequence,
                              Time arrival, Time departure) {
     }
 
@@ -433,7 +433,7 @@ public class TripParser extends Parser {
     /**
      * @param stops An array of packed ints in the form of {@code (routeStopId<<32 | minOffset)}
      */
-    public record RouteStopsContainer(int stopId, short postId, short serviceId, Time startTime, long[] stops) {
+    public record RouteStopsContainer(short stopId, short postId, short serviceId, Time startTime, long[] stops) {
     }
 
 
