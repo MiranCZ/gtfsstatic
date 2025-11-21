@@ -107,6 +107,7 @@ public class TripParser extends Parser {
 
         int routeStopIndex = 0;
         int lineNumber = 0;
+        int index = 0;
 
         List<Route> result = new ArrayList<>();
 
@@ -132,7 +133,7 @@ public class TripParser extends Parser {
                     throw new IllegalStateException(currentRoute + " ; " + tripId + " ; " + sequence);
                 }
 
-                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId, stopInfo.stopId(), stopInfo.postId(), sequence,
+                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId, stopInfo.stopId(), stopInfo.postId(), index++,
                         Time.parse(line.get("arrival_time")), Time.parse(line.get("departure_time"))
                 );
 
@@ -143,8 +144,9 @@ public class TripParser extends Parser {
                 currentRoute.length = lineNumber-currentRoute.startPos();
                 result.add(currentRoute);
                 currentRoute = new Route(tripId, lineNumber);
+                index = 0;
 
-                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId(), stopInfo.stopId(), stopInfo.postId(), sequence,
+                RouteStop routeStop = new RouteStop(routeStops.size(), currentRoute.tripId(), stopInfo.stopId(), stopInfo.postId(), index++,
                         Time.parse(line.get("arrival_time")), Time.parse(line.get("departure_time"))
                 );
                 stopIdToRoute.computeIfAbsent(routeStop.stopId(), k -> new ArrayList<>()).add(routeStopIndex++);
