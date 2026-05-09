@@ -3,10 +3,8 @@ package io.github.mirancz.gtfsparser.parsing;
 import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
 
 import java.awt.*;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 
 public class LineInfoParser extends Parser {
