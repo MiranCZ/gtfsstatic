@@ -1,10 +1,10 @@
 package io.github.mirancz.gtfsparser.parsing;
 
 import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
-import io.github.mirancz.gtfsparser.util.IdStorage;
+import io.github.mirancz.gtfsparser.util.Utils;
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Iterator;
 
@@ -23,37 +23,17 @@ public class StopParser extends Parser {
 
         while (lines.hasNext()) {
             Csv.CsvLine line = lines.next();
-            int stopId = IdStorage.STOP.getId(parseStopId(line.get("stop_id")));
+            int stopId = Utils.parseStop(line.get("stop_id")).stopId();
             if (processed.contains(stopId)) continue;
             processed.add(stopId);
 
             output.writeBoolean(true);
-
-            String stopName = line.get("stop_name");
-
             output.writeInt(stopId);
-
-            output.writeString(stopName);
-
+            output.writeString(line.get("stop_name"));
             output.writeDouble(line.getDouble("stop_lat"));
             output.writeDouble(line.getDouble("stop_lon"));
         }
         output.writeBoolean(false);
-    }
-
-    private static int parseStopId(String stopId) {
-        if (!stopId.startsWith("U")) {
-            System.out.println("[WARN] Invalid stop "+stopId);
-            return -1;
-        }
-        stopId = stopId.substring(1);
-        int ind = Math.max(stopId.indexOf("Z"), stopId.indexOf("N"));
-        if (ind == -1) {
-            System.out.println("[WARN] Invalid stop  "+stopId);
-            return -1;
-        }
-
-        return Integer.parseInt(stopId.substring(0, ind));
     }
 
 }

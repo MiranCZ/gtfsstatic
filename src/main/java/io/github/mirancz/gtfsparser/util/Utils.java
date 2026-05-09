@@ -3,6 +3,10 @@ package io.github.mirancz.gtfsparser.util;
 public class Utils {
 
     public static StopInfo parseStop(String stopUID) {
+        if (!stopUID.startsWith("U")) {
+            throw new IllegalStateException("Invalid stop UID: "+stopUID);
+        }
+
         // format is U{stopId}Z{postId} or U{stopId}N{postId}
 
         int zInd = stopUID.indexOf("Z");
