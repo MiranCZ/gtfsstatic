@@ -43,10 +43,11 @@ public class IdStorage {
     public static class MappingIndexer implements Indexer {
 
         private final Map<Integer, Integer> idToIndex;
-        private int ID = 0;
+        private int ID;
 
         private MappingIndexer(Map<Integer, Integer> initial) {
             this.idToIndex = initial;
+            this.ID = initial.size();
         }
 
         public int getId(int original) {
