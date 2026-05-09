@@ -68,7 +68,8 @@ public class Main {
         output.writeBoolean(false);
         output.close();
 
-        Files.writeString(getDataRoot().resolve("info"), generateInfoString());
+        long byteSize = Files.size(getDataRoot().resolve("data"));
+        Files.writeString(getDataRoot().resolve("info"), generateInfoString(byteSize));
     }
 
     private static void createDocsDir() {
@@ -134,9 +135,10 @@ public class Main {
         s.close();
     }
 
-    private static String generateInfoString() {
+    private static String generateInfoString(long byteSize) {
         return "{" +
-                "\"lastUpdated\":"+System.currentTimeMillis()+
+                "\"lastUpdated\":"+System.currentTimeMillis()+"," +
+                "\"byteSize\":"+byteSize+
                 "}";
     }
 
