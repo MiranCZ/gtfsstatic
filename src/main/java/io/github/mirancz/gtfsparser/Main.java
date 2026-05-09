@@ -28,10 +28,7 @@ public class Main {
     }
 
     public static void main(String[] args) throws Exception {
-        var created = new File("docs/").mkdirs();
-        if (!created) {
-            throw new IllegalStateException("Failed to create 'docs' folder");
-        }
+        createDocsDir();
 
         URL url = new URL(GTFS_URL);
 
@@ -72,6 +69,18 @@ public class Main {
         output.close();
 
         Files.writeString(getDataRoot().resolve("info"), generateInfoString());
+    }
+
+    private static void createDocsDir() {
+        var dir = new File("docs/");
+        if (dir.exists()) {
+            return;
+        }
+
+        var created = dir.mkdirs();
+        if (!created) {
+            throw new IllegalStateException("Failed to create 'docs' folder");
+        }
     }
 
     private static void writePosts(Function<String, CheckedOutputStream> outputProvider) throws IOException {
