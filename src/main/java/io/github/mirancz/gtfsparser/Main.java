@@ -27,7 +27,12 @@ public class Main {
         parsers = List.of(new StopParser(), new LineInfoParser(), new TripParser(), new ApiParser(), new CalendarParser(), new TransfersParser());
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws Exception {
+        var created = new File("docs/").mkdirs();
+        if (!created) {
+            throw new IllegalStateException("Failed to create 'docs' folder");
+        }
+
         URL url = new URL(GTFS_URL);
 
         HttpURLConnection con = (HttpURLConnection) url.openConnection();
@@ -127,12 +132,7 @@ public class Main {
     }
 
     private static Path getDataRoot() {
-        File file = new File("docs/");
-        if (!file.exists()) {
-            file.mkdir();
-        }
-
-        return file.toPath();
+        return Path.of("docs/");
     }
     
     public static File getStopMapsFile() {
