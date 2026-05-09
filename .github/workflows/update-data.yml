@@ -1,0 +1,50 @@
+name: Update GTFS Data
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Download GTFS zip
+        run: curl -fsSL https://kordis-jmk.cz/gtfs/gtfs.zip -o /tmp/gtfs.zip
+
+      - name: Check if data changed
+        id: check
+        run: |
+          NEW_HASH=$(sha256sum /tmp/gtfs.zip | cut -d' ' -f1)
+          OLD_HASH=$(cat docs/gtfs.hash 2>/dev/null || echo "")
+          echo "new_hash=$NEW_HASH" >> $GITHUB_OUTPUT
+          if [ "$NEW_HASH" != "$OLD_HASH" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run parser
+        if: steps.check.outputs.changed == 'true'
+        run: ./gradlew run
+
+      - name: Commit and push updated data
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          echo "${{ steps.check.outputs.new_hash }}" > docs/gtfs.hash
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data docs/info docs/gtfs.hash docs/storage/posts docs/storage/stop_maps
+          git commit -m "Update GTFS data"
+          git push
