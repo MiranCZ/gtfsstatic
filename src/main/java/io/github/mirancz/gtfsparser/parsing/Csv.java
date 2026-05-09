@@ -1,6 +1,5 @@
 package io.github.mirancz.gtfsparser.parsing;
 
-import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.util.*;
 import java.util.function.Function;
@@ -9,10 +8,17 @@ public class Csv {
 
 
 
+    private static final char UTF8_BOM = '\uFEFF';
+
     public static Csv parse(InputStream inputStream) {
         Scanner scanner = new Scanner(inputStream);
 
-        return new Csv(parseCsvLine(scanner.nextLine()), scanner);
+        String header = scanner.nextLine();
+        if (!header.isEmpty() && header.charAt(0) == UTF8_BOM) {
+            header = header.substring(1);
+        }
+
+        return new Csv(parseCsvLine(header), scanner);
     }
 
     private static List<String> parseCsvLine(String line) {
@@ -52,13 +58,7 @@ public class Csv {
 
         descriptorMap = new HashMap<>();
         for (int i = 0; i < descriptors.size(); i++) {
-            String desc = descriptors.get(i);
-
-            // idfk what this is
-            if (((int)desc.charAt(0)) == 65279) {
-                desc = desc.substring(1);
-            }
-            descriptorMap.put(desc, i);
+            descriptorMap.put(descriptors.get(i), i);
         }
     }
 
