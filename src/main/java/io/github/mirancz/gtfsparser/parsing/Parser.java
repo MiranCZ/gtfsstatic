@@ -3,7 +3,6 @@ package io.github.mirancz.gtfsparser.parsing;
 import io.github.mirancz.gtfsparser.util.CheckedOutputStream;
 import io.github.mirancz.gtfsparser.util.Pair;
 
-import java.io.DataOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,8 +16,8 @@ public abstract class Parser {
     private final Map<String, Pair<String, Transformer>> transformers = new HashMap<>();
     private final Map<String, Consumer<InputStream>> readers = new HashMap<>();
 
-    public final void onFile(String name, InputStream input, Function<String, CheckedOutputStream> outputProvider) {
-        try(WrappedOutputProvider wrapped = new WrappedOutputProvider(outputProvider)) {
+    public final void onFile(String name, InputStream input, Function<String, CheckedOutputStream> outputProvider) throws Exception {
+        try (WrappedOutputProvider wrapped = new WrappedOutputProvider(outputProvider)) {
             onFileInternal(name, input, wrapped::generate);
 
             if (transformers.containsKey(name)) {
@@ -29,17 +28,12 @@ public abstract class Parser {
             if (readers.containsKey(name)) {
                 readers.get(name).accept(input);
             }
-
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 
-    public final void onFinish(Function<String, CheckedOutputStream> outputProvider) {
-        try(WrappedOutputProvider wrapped = new WrappedOutputProvider(outputProvider)) {
+    public final void onFinish(Function<String, CheckedOutputStream> outputProvider) throws Exception {
+        try (WrappedOutputProvider wrapped = new WrappedOutputProvider(outputProvider)) {
             onFinishInternal(wrapped::generate);
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 
@@ -79,12 +73,18 @@ public abstract class Parser {
             return generated;
         }
 
-
         @Override
         public void close() throws Exception {
+            Exception first = null;
             for (CheckedOutputStream stream : streams) {
-                stream.close();
+                try {
+                    stream.close();
+                } catch (Exception e) {
+                    if (first == null) first = e;
+                    else first.addSuppressed(e);
+                }
             }
+            if (first != null) throw first;
         }
     }
 
