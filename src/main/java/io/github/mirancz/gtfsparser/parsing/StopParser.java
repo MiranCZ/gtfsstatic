@@ -30,6 +30,7 @@ public class StopParser extends Parser {
             output.writeBoolean(true);
             output.writeInt(stopId);
             output.writeString(line.get("stop_name"));
+            output.writeString(line.get("parent_station"));
             output.writeDouble(line.getDouble("stop_lat"));
             output.writeDouble(line.getDouble("stop_lon"));
         }
